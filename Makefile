@@ -4,11 +4,12 @@ GIT_COMMIT=$(shell git rev-parse HEAD)
 GIT_DIRTY=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 BUILD_DATE=$(shell date '+%Y-%m-%d-%H:%M:%S')
 BUILDER_IMAGE=cvbarros/terraform-provider-teamcity-builder
+VERSION=0.0.0
 
 default: test
 
 build:
-	GO111MODULE=on go build -o ./bin/terraform-provider-teamcity_${VERSION}
+	GO111MODULE=on go build -C ./teamcity -o ../bin/terraform-provider-teamcity_${VERSION}
 
 install: build
 	cp ./bin/terraform-provider-teamcity_${VERSION} ~/.terraform.d/plugins/

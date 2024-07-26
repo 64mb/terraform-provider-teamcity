@@ -14,7 +14,7 @@ resource "teamcity_vcs_root_git" "vcs" {
   name       = "Application"
   project_id = teamcity_project.project.id
 
-  fetch_url      = "https://github.com/cvbarros/go-teamcity"
+  fetch_url      = "https://github.com/64mb/go-teamcity"
   default_branch = "refs/head/master"
 }
 

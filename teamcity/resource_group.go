@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	api "github.com/cvbarros/go-teamcity/teamcity"
+	api "github.com/64mb/go-teamcity/teamcity"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 

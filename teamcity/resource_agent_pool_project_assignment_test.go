@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/cvbarros/go-teamcity/teamcity"
-	"github.com/cvbarros/terraform-provider-teamcity/teamcity"
+	api "github.com/64mb/go-teamcity/teamcity"
+	"github.com/64mb/terraform-provider-teamcity/teamcity"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 )

@@ -14,7 +14,7 @@ resource "teamcity_project" "project" {
 resource "teamcity_vcs_root_git" "vcsroot" {
   name           = "Application"
   project_id     = teamcity_project.project.id
-  fetch_url      = "https://github.com/cvbarros/terraform-provider-teamcity"
+  fetch_url      = "https://github.com/64mb/terraform-provider-teamcity"
   default_branch = "refs/head/master"
 
   branches = [
