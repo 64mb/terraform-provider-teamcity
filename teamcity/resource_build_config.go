@@ -132,6 +132,15 @@ func resourceBuildConfig() *schema.Resource {
 							Type:     schema.TypeString,
 							Optional: true,
 						},
+						"docker_image": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+						"docker_image_platform": {
+							Type:         schema.TypeString,
+							Optional:     true,
+							ValidateFunc: validation.StringInSlice([]string{"linux", "windows"}, false),
+						},
 					},
 				},
 			},
@@ -197,6 +206,17 @@ func resourceBuildConfig() *schema.Resource {
 							Optional:     true,
 							ValidateFunc: validation.IntAtLeast(0),
 							Default:      0,
+						},
+						"checkout_mode": {
+							Type:         schema.TypeString,
+							Optional:     true,
+							ValidateFunc: validation.StringInSlice([]string{"AUTO", "ON_AGENT", "ON_SERVER", "MANUAL"}, false),
+							Default:      "AUTO",
+						},
+						"clean_build": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							Default:  false,
 						},
 					},
 				},
@@ -556,10 +576,23 @@ func flattenTemplates(d *schema.ResourceData, templates *api.Templates) error {
 }
 
 func flattenParameterCollection(d *schema.ResourceData, params *api.Parameters) error {
-	var configParams, sysParams, envParams = flattenParameters(params)
+	var configParams, sysParams, envParams, envParamsSecure = flattenParameters(params)
 
 	if len(envParams) > 0 {
 		if err := d.Set("env_params", envParams); err != nil {
+			return err
+		}
+	}
+	if len(envParamsSecure) > 0 {
+		env_params_secure := d.Get("env_params_secure").(map[string]any)
+		for k := range envParamsSecure {
+			if env_params_secure != nil {
+				if val, ok := env_params_secure[k]; ok {
+					envParamsSecure[k] = val.(string)
+				}
+			}
+		}
+		if err := d.Set("env_params_secure", envParamsSecure); err != nil {
 			return err
 		}
 	}
@@ -579,15 +612,27 @@ func flattenParameterCollection(d *schema.ResourceData, params *api.Parameters) 
 func expandParameterCollection(d *schema.ResourceData) (*api.Parameters, error) {
 	var config, system, env *api.Parameters
 	if v, ok := d.GetOk("env_params"); ok {
-		p, err := expandParameters(v.(map[string]interface{}), api.ParameterTypes.EnvironmentVariable)
+		p, err := expandParameters(v.(map[string]interface{}), api.ParameterTypes.EnvironmentVariable, "")
 		if err != nil {
 			return nil, err
 		}
 		env = p
 	}
 
+	if v, ok := d.GetOk("env_params_secure"); ok {
+		p, err := expandParameters(v.(map[string]interface{}), api.ParameterTypes.EnvironmentVariable, "password display='hidden' readOnly='true'")
+		if err != nil {
+			return nil, err
+		}
+		if env != nil {
+			env = env.Concat(p)
+		} else {
+			env = p
+		}
+	}
+
 	if v, ok := d.GetOk("sys_params"); ok {
-		p, err := expandParameters(v.(map[string]interface{}), api.ParameterTypes.System)
+		p, err := expandParameters(v.(map[string]interface{}), api.ParameterTypes.System, "")
 		if err != nil {
 			return nil, err
 		}
@@ -595,7 +640,7 @@ func expandParameterCollection(d *schema.ResourceData) (*api.Parameters, error) 
 	}
 
 	if v, ok := d.GetOk("config_params"); ok {
-		p, err := expandParameters(v.(map[string]interface{}), api.ParameterTypes.Configuration)
+		p, err := expandParameters(v.(map[string]interface{}), api.ParameterTypes.Configuration, "")
 		if err != nil {
 			return nil, err
 		}
@@ -616,25 +661,29 @@ func expandParameterCollection(d *schema.ResourceData) (*api.Parameters, error) 
 	return out, nil
 }
 
-func flattenParameters(dt *api.Parameters) (config map[string]string, sys map[string]string, env map[string]string) {
-	env, sys, config = make(map[string]string), make(map[string]string), make(map[string]string)
+func flattenParameters(dt *api.Parameters) (config map[string]string, sys map[string]string, env map[string]string, env_secure map[string]string) {
+	env, sys, config, env_secure = make(map[string]string), make(map[string]string), make(map[string]string), make(map[string]string)
 	for _, p := range dt.Items {
 		switch p.Type {
 		case api.ParameterTypes.Configuration:
 			config[p.Name] = p.Value
 		case api.ParameterTypes.EnvironmentVariable:
-			env[p.Name] = p.Value
+			if strings.Contains(p.Spec, "password") {
+				env_secure[p.Name] = p.Value
+			} else {
+				env[p.Name] = p.Value
+			}
 		case api.ParameterTypes.System:
 			sys[p.Name] = p.Value
 		}
 	}
-	return config, sys, env
+	return config, sys, env, env_secure
 }
 
-func expandParameters(raw map[string]interface{}, paramType string) (*api.Parameters, error) {
+func expandParameters(raw map[string]interface{}, paramType string, spec string) (*api.Parameters, error) {
 	out := api.NewParametersEmpty()
 	for k, v := range raw {
-		p, err := api.NewParameter(paramType, k, v.(string))
+		p, err := api.NewParameter(paramType, k, v.(string), spec)
 		if err != nil {
 			return nil, err
 		}
@@ -680,6 +729,12 @@ func expandBuildConfigOptionsRaw(v *schema.Set) (*api.BuildTypeOptions, error) {
 	if v, ok := raw["concurrent_limit"]; ok {
 		opt.MaxSimultaneousBuilds = v.(int)
 	}
+	if v, ok := raw["clean_build"]; ok {
+		opt.CleanBuild = v.(bool)
+	}
+	if v, ok := raw["checkout_mode"]; ok {
+		opt.CheckoutMode = v.(string)
+	}
 
 	return opt, nil
 }
@@ -699,6 +754,8 @@ func flattenBuildConfigOptionsRaw(dt *api.BuildTypeOptions) map[string]interface
 	m["detect_hanging"] = dt.EnableHangingBuildsDetection
 	m["status_widget"] = dt.EnableStatusWidget
 	m["concurrent_limit"] = dt.MaxSimultaneousBuilds
+	m["clean_build"] = dt.CleanBuild
+	m["checkout_mode"] = dt.CheckoutMode
 
 	return m
 }
@@ -752,6 +809,12 @@ func flattenBuildStepCmdLine(s *api.StepCommandLine) map[string]interface{} {
 	if s.Name != "" {
 		m["name"] = s.Name
 	}
+	if s.DockerImage != "" {
+		m["docker_image"] = s.DockerImage
+	}
+	if s.DockerImagePlatform != "" {
+		m["docker_image_platform"] = s.DockerImagePlatform
+	}
 	m["type"] = "cmd_line"
 
 	return m
@@ -785,7 +848,7 @@ func expandBuildStep(raw interface{}) (api.Step, error) {
 }
 
 func expandStepCmdLine(dt map[string]interface{}) (*api.StepCommandLine, error) {
-	var file, args, name, code string
+	var file, args, name, code, docker_image, docker_image_platform string
 
 	if v, ok := dt["file"]; ok {
 		file = v.(string)
@@ -799,13 +862,24 @@ func expandStepCmdLine(dt map[string]interface{}) (*api.StepCommandLine, error) 
 	if v, ok := dt["code"]; ok {
 		code = v.(string)
 	}
+	if v, ok := dt["docker_image"]; ok {
+		docker_image = v.(string)
+	}
+	if v, ok := dt["docker_image_platform"]; ok {
+		docker_image_platform = v.(string)
+	}
+
+	props := map[string]string{
+		"docker_image":          docker_image,
+		"docker_image_platform": docker_image_platform,
+	}
 
 	var s *api.StepCommandLine
 	var err error
 	if file != "" {
 		s, err = api.NewStepCommandLineExecutable(name, file, args)
 	} else {
-		s, err = api.NewStepCommandLineScript(name, code)
+		s, err = api.NewStepCommandLineScript(name, code, props)
 	}
 	if err != nil {
 		return nil, err

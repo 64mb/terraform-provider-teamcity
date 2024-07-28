@@ -1,17 +1,18 @@
 Terraform Provider TeamCity
 ==================
-[![Build Status](https://travis-ci.com/cvbarros/terraform-provider-teamcity.svg?branch=master)](https://travis-ci.com/cvbarros/terraform-provider-teamcity)
 
 Motivation:
 
 [Building Builds: TeamCity Pipelines as Code using Terraform](https://cvbarros.io/2018/11/building-builds---teamcity-pipelines-as-code-using-terraform/)
 
 
-## LOOKING FOR MAINTAINTERS ##
+## FORK FROM MAIN REPO ##
 
-This project is in need of new maintainers, please see here:  
+Main projects is in need of new maintainers:  
 https://github.com/cvbarros/go-teamcity/issues/94.  
 https://github.com/cvbarros/terraform-provider-teamcity/issues/113
+
+This project continue development with new features
 
 Installation
 ------------

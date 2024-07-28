@@ -11,11 +11,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
 )
 
-func resourceFeatureCommitStatusPublisher() *schema.Resource {
+func resourceFeaturePullRequests() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceFeatureCommitStatusPublisherCreate,
-		Read:   resourceFeatureCommitStatusPublisherRead,
-		Delete: resourceFeatureCommitStatusPublisherDelete,
+		Create: resourceFeaturePullRequestsCreate,
+		Read:   resourceFeaturePullRequestsRead,
+		Delete: resourceFeaturePullRequestsDelete,
 		Importer: &schema.ResourceImporter{
 			State: schema.ImportStatePassthrough,
 		},
@@ -26,11 +26,17 @@ func resourceFeatureCommitStatusPublisher() *schema.Resource {
 				Required: true,
 				ForceNew: true,
 			},
-			"publisher": {
+			"hosting": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.StringInSlice([]string{"github"}, true),
+			},
+			"filter_author_role": {
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				ValidateFunc: validation.StringInSlice([]string{"MEMBER", "MEMBER_OR_COLLABORATOR", "EVERYBODY"}, true),
 			},
 			"github": {
 				Type:     schema.TypeSet,
@@ -44,12 +50,6 @@ func resourceFeatureCommitStatusPublisher() *schema.Resource {
 							Required:     true,
 							ValidateFunc: validation.StringInSlice([]string{"token", "password"}, true),
 							ForceNew:     true,
-						},
-						"host": {
-							Type:     schema.TypeString,
-							Optional: true,
-							Default:  "https://api.github.com",
-							ForceNew: true,
 						},
 						"username": {
 							Type:     schema.TypeString,
@@ -72,13 +72,13 @@ func resourceFeatureCommitStatusPublisher() *schema.Resource {
 						},
 					},
 				},
-				Set: githubPublisherOptionsHash,
+				Set: githubProviderOptionsHash,
 			},
 		},
 	}
 }
 
-func resourceFeatureCommitStatusPublisherCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceFeaturePullRequestsCreate(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*api.Client)
 	var buildConfigID string
 
@@ -95,7 +95,7 @@ func resourceFeatureCommitStatusPublisherCreate(d *schema.ResourceData, meta int
 
 	//Only Github publisher for now - Add support for more publishers later
 
-	dt, err := buildGithubCommitStatusPublisher(d)
+	dt, err := buildGithubPullRequests(d)
 	if err != nil {
 		return err
 	}
@@ -107,13 +107,13 @@ func resourceFeatureCommitStatusPublisherCreate(d *schema.ResourceData, meta int
 
 	d.SetId(out.ID())
 
-	return resourceFeatureCommitStatusPublisherRead(d, meta)
+	return resourceFeaturePullRequestsRead(d, meta)
 }
 
-func resourceFeatureCommitStatusPublisherRead(d *schema.ResourceData, meta interface{}) error {
+func resourceFeaturePullRequestsRead(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*api.Client).BuildFeatureService(d.Get("build_config_id").(string))
 
-	dt, err := getBuildFeatureCommitPublisher(d, client, d.Id())
+	dt, err := getBuildFeaturePullRequests(d, client, d.Id())
 
 	if dt == nil && err == nil {
 		return nil
@@ -128,16 +128,15 @@ func resourceFeatureCommitStatusPublisherRead(d *schema.ResourceData, meta inter
 	}
 
 	//TODO: Implement other publishers
-	if err := d.Set("publisher", "github"); err != nil {
+	if err := d.Set("hosting", "github"); err != nil {
 		return err
 	}
 
-	opt := dt.Options.(*api.StatusPublisherGithubOptions)
+	opt := dt.Options.(*api.PullRequestsGithubOptions)
 
 	var optsToSave []map[string]interface{}
 	m := make(map[string]interface{})
 	m["auth_type"] = opt.AuthenticationType
-	m["host"] = opt.Host
 
 	if opt.AuthenticationType == "password" {
 		m["username"] = opt.Username
@@ -147,30 +146,30 @@ func resourceFeatureCommitStatusPublisherRead(d *schema.ResourceData, meta inter
 	return d.Set("github", optsToSave)
 }
 
-func resourceFeatureCommitStatusPublisherDelete(d *schema.ResourceData, meta interface{}) error {
+func resourceFeaturePullRequestsDelete(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*api.Client)
 	svr := client.BuildFeatureService(d.Get("build_config_id").(string))
 
 	return svr.Delete(d.Id())
 }
 
-func buildGithubCommitStatusPublisher(d *schema.ResourceData) (api.BuildFeature, error) {
-	var opt api.StatusPublisherGithubOptions
+func buildGithubPullRequests(d *schema.ResourceData) (api.BuildFeature, error) {
+	var opt api.PullRequestsGithubOptions
 	// MaxItems ensure at most 1 github element
 	local := d.Get("github").(*schema.Set).List()[0].(map[string]interface{})
-	host := local["host"].(string)
 	authType := local["auth_type"].(string)
+	filterAuthorRole := d.Get("filter_author_role").(string)
 	switch strings.ToLower(authType) {
 	case "token":
-		opt = api.NewCommitStatusPublisherGithubOptionsToken(host, local["access_token"].(string))
+		opt = api.NewPullRequestsGithubOptionsToken(local["access_token"].(string), filterAuthorRole)
 	case "password":
-		opt = api.NewCommitStatusPublisherGithubOptionsPassword(host, local["username"].(string), local["password"].(string))
+		opt = api.NewPullRequestsGithubOptionsPassword(local["username"].(string), local["password"].(string), filterAuthorRole)
 	}
 
-	return api.NewFeatureCommitStatusPublisherGithub(opt, "")
+	return api.NewFeaturePullRequestsGithub(opt, "")
 }
 
-func getBuildFeatureCommitPublisher(d *schema.ResourceData, c *api.BuildFeatureService, id string) (*api.FeatureCommitStatusPublisher, error) {
+func getBuildFeaturePullRequests(d *schema.ResourceData, c *api.BuildFeatureService, id string) (*api.FeaturePullRequests, error) {
 	dt, err := c.GetByID(id)
 
 	if err != nil && strings.Contains(err.Error(), "404") {
@@ -182,15 +181,14 @@ func getBuildFeatureCommitPublisher(d *schema.ResourceData, c *api.BuildFeatureS
 		return nil, err
 	}
 
-	fcsp := dt.(*api.FeatureCommitStatusPublisher)
+	fcsp := dt.(*api.FeaturePullRequests)
 	return fcsp, nil
 }
 
-func githubPublisherOptionsHash(v interface{}) int {
+func githubProviderOptionsHash(v interface{}) int {
 	var buf bytes.Buffer
 	m := v.(map[string]interface{})
 	buf.WriteString(fmt.Sprintf("%s-", m["auth_type"].(string)))
-	buf.WriteString(fmt.Sprintf("%s-", m["host"].(string)))
 
 	if v, ok := m["username"]; ok {
 		buf.WriteString(fmt.Sprintf("%s-", v.(string)))

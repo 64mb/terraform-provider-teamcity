@@ -36,9 +36,39 @@ func resourceProject() *schema.Resource {
 				Type:     schema.TypeMap,
 				Optional: true,
 			},
+			"env_params_secure": {
+				Type:      schema.TypeMap,
+				Optional:  true,
+				Sensitive: true,
+			},
+			// "env_param_spec": {
+			// 	Type:     schema.TypeList,
+			// 	Optional: true,
+			// 	Elem: &schema.Resource{
+			// 		Schema: map[string]*schema.Schema{
+			// 			"name": {
+			// 				Type:     schema.TypeString,
+			// 				Required: true,
+			// 			},
+			// 			"value": {
+			// 				Type:     schema.TypeString,
+			// 				Required: true,
+			// 			},
+			// 			"spec": {
+			// 				Type:     schema.TypeString,
+			// 				Required: true,
+			// 			},
+			// 		},
+			// 	},
+			// },
 			"config_params": {
 				Type:     schema.TypeMap,
 				Optional: true,
+			},
+			"config_params_secure": {
+				Type:      schema.TypeMap,
+				Optional:  true,
+				Sensitive: true,
 			},
 			"sys_params": {
 				Type:     schema.TypeMap,

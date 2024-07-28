@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 )
 
-//Provider is the plugin entry point
+// Provider is the plugin entry point
 func Provider() terraform.ResourceProvider {
 	return &schema.Provider{
 		ResourcesMap: map[string]*schema.Resource{
@@ -20,11 +20,14 @@ func Provider() terraform.ResourceProvider {
 			"teamcity_build_trigger_schedule":          resourceBuildTriggerSchedule(),
 			"teamcity_build_trigger_vcs":               resourceBuildTriggerVcs(),
 			"teamcity_feature_commit_status_publisher": resourceFeatureCommitStatusPublisher(),
+			"teamcity_feature_pull_requests":           resourceFeaturePullRequests(),
+			"teamcity_feature_ssh_agent":               resourceFeatureSshAgent(),
 			"teamcity_group":                           resourceGroup(),
 			"teamcity_group_role_assignment":           resourceGroupRoleAssignment(),
 			"teamcity_project":                         resourceProject(),
 			"teamcity_snapshot_dependency":             resourceSnapshotDependency(),
 			"teamcity_vcs_root_git":                    resourceVcsRootGit(),
+			"teamcity_ssh_key":                         resourceSshKey(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"teamcity_agent_pool": dataSourceAgentPool(),
